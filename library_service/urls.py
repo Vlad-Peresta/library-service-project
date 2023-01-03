@@ -22,4 +22,8 @@ urlpatterns = [
         "users/",
         include("customers_service.urls", namespace="customers_service")
     ),
+    path(
+        "books/",
+        include("books_service.urls", namespace="books_service")
+    ),
 ]
