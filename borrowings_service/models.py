@@ -19,16 +19,30 @@ class Borrowing(models.Model):
         get_user_model(), on_delete=models.CASCADE, related_name="borrowings"
     )
 
-    def clean(self):
-        if self.borrow_date > self.expected_return_date:
-            raise ValidationError(
+    @staticmethod
+    def validate_dates(
+            borrow_date,
+            expected_return_date,
+            actual_return_date,
+            error_to_raise,
+    ):
+        if borrow_date > expected_return_date:
+            raise error_to_raise(
                 _("Borrow date should not be later than expected return date")
             )
 
-        if self.borrow_date > self.actual_return_date:
-            raise ValidationError(
+        if borrow_date > actual_return_date:
+            raise error_to_raise(
                 _("Borrow date should not be later than actual return date")
             )
+
+    def clean(self):
+        self.validate_dates(
+            self.borrow_date,
+            self.expected_return_date,
+            self.actual_return_date,
+            ValidationError,
+        )
 
     def save(self, *args, **kwargs):
         self.full_clean()
