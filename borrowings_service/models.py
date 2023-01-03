@@ -11,7 +11,7 @@ from books_service.models import Book
 class Borrowing(models.Model):
     borrow_date = models.DateField(default=date.today)
     expected_return_date = models.DateField()
-    actual_return_date = models.DateField()
+    actual_return_date = models.DateField(blank=True, null=True)
     book = models.ForeignKey(
         Book, on_delete=models.CASCADE, related_name="borrowings"
     )
@@ -31,7 +31,7 @@ class Borrowing(models.Model):
                 _("Borrow date should not be later than expected return date")
             )
 
-        if borrow_date > actual_return_date:
+        if actual_return_date and borrow_date > actual_return_date:
             raise error_to_raise(
                 _("Borrow date should not be later than actual return date")
             )
