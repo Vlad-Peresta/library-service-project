@@ -61,3 +61,9 @@ class BorrowingCreateSerializer(serializers.ModelSerializer):
                 "Such book is not available in the library"
             )
         return value
+
+
+class BorrowingReturnSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Borrowing
+        fields = ("actual_return_date",)
