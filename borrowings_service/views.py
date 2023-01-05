@@ -1,10 +1,14 @@
-from rest_framework import mixins, viewsets
+from django.db import transaction
+from rest_framework import mixins, viewsets, status
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from borrowings_service.models import Borrowing
 from borrowings_service.serializers import (
     BorrowingSerializer,
-    BorrowingCreateSerializer
+    BorrowingCreateSerializer, BorrowingReturnSerializer
 )
 
 
@@ -49,7 +53,41 @@ class BorrowingListCreateDetailViewSet(
         if self.action == "create":
             return BorrowingCreateSerializer
 
+        if self.action == "return_book":
+            return BorrowingReturnSerializer
+
         return BorrowingSerializer
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    @action(
+        methods=["post"],
+        detail=True,
+        url_path="return",
+        permission_classes=[IsAuthenticated],
+    )
+    def return_book(self, request, pk=None):
+        """Endpoint for returning borrowing book"""
+        borrowing = self.get_object()
+        book = borrowing.book
+        serializer = self.get_serializer(borrowing, data=request.data)
+
+        if borrowing.actual_return_date is not None:
+            raise ValidationError("Book have already returned")
+
+        if serializer.is_valid():
+            Borrowing.validate_dates(
+                borrowing.borrow_date,
+                borrowing.expected_return_date,
+                serializer.validated_data["actual_return_date"],
+                ValidationError
+            )
+            with transaction.atomic():
+                serializer.save()
+                book.inventory += 1
+                book.save()
+
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
