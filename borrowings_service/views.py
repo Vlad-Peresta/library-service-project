@@ -1,4 +1,6 @@
 from django.db import transaction
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -91,3 +93,21 @@ class BorrowingListCreateDetailViewSet(
                 return Response(serializer.data, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "user_id",
+                type=OpenApiTypes.INT,
+                description="Filter by user id (ex. ?user_id=1)",
+            ),
+            OpenApiParameter(
+                "is_active",
+                type=OpenApiTypes.STR,
+                description="Filter by active or returned borrowing status "
+                            "(ex. ?is_active=active or ?is_active=returned)",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
