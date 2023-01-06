@@ -61,3 +61,5 @@ python3 manage.py runserver
 * get access token /users/token/
 
 ## Project screenshots
+![image](https://user-images.githubusercontent.com/106173314/211079460-86b50e72-79be-483e-9cca-d9f3dfac099c.png)
+![image](https://user-images.githubusercontent.com/106173314/211079568-235a5207-dcf5-4926-9efd-c9e04fd2d9e0.png)
