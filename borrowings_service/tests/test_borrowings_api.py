@@ -17,7 +17,7 @@ def sample_book(**params):
         "title": "sample",
         "author": "sample",
         "cover": "Hard",
-        "inventory": 2,
+        "inventory": 3,
         "daily_fee": 2.00,
     }
     defaults.update(params)
@@ -51,7 +51,7 @@ class UnauthenticatedBorrowingsApiTests(TestCase):
 class AuthenticatedBorrowingsApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = get_user_model().objects.create_superuser(
+        self.user = get_user_model().objects.create_user(
             email="admin.user@mail.com",
             password="1qazcde3",
             first_name="Bob",
@@ -84,6 +84,7 @@ class AuthenticatedBorrowingsApiTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, serializer.data)
+        self.assertEqual(borrowings.count(), 2)
 
     def test_borrowings_with_book_inventory_equal_zero(self):
         book = sample_book(inventory=0)
@@ -131,8 +132,106 @@ class AuthenticatedBorrowingsApiTests(TestCase):
             "actual_return_date": "2023-01-09",
         }
         response = self.client.post(BORROWINGS_RETURN_URL, payload)
-        book_after_returning = Book.objects.get(id=1)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_filtering_borrowings_by_active_status(self):
+        book = sample_book()
+        borrowing1 = sample_borrowing(self.user, book, actual_return_date=None)
+        borrowing2 = sample_borrowing(self.user, book, actual_return_date=None)
+        borrowing3 = sample_borrowing(self.user, book)
 
+        response = self.client.get(
+            BORROWINGS_URL, {"is_active": "active"}
+        )
+
+        serializer1 = BorrowingSerializer(borrowing1)
+        serializer2 = BorrowingSerializer(borrowing2)
+        serializer3 = BorrowingSerializer(borrowing3)
+
+        self.assertIn(serializer1.data, response.data)
+        self.assertIn(serializer2.data, response.data)
+        self.assertNotIn(serializer3.data, response.data)
+
+    def test_filtering_borrowings_by_returned_status(self):
+        book = sample_book()
+        borrowing1 = sample_borrowing(self.user, book, actual_return_date=None)
+        borrowing2 = sample_borrowing(self.user, book)
+        borrowing3 = sample_borrowing(self.user, book)
+
+        response = self.client.get(
+            BORROWINGS_URL, {"is_active": "returned"}
+        )
+
+        serializer1 = BorrowingSerializer(borrowing1)
+        serializer2 = BorrowingSerializer(borrowing2)
+        serializer3 = BorrowingSerializer(borrowing3)
+
+        self.assertNotIn(serializer1.data, response.data)
+        self.assertIn(serializer2.data, response.data)
+        self.assertIn(serializer3.data, response.data)
+
+
+class AdminBorrowingsApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_superuser(
+            email="admin.user@mail.com",
+            password="1qazcde3",
+            first_name="Bob",
+            last_name="Smith",
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_list_all_users_borrowings(self):
+        user = get_user_model().objects.create_user(
+            email="user@mail.com",
+            password="1qazcde34",
+            first_name="Sem",
+            last_name="Smith",
+        )
+
+        book1 = sample_book(title="sample1")
+        book2 = sample_book(title="sample2")
+
+        sample_borrowing(user=self.user, book=book1)
+        sample_borrowing(user=self.user, book=book2)
+
+        sample_borrowing(user=user, book=book1)
+        sample_borrowing(user=user, book=book2)
+
+        response = self.client.get(BORROWINGS_URL)
+
+        borrowings = Borrowing.objects.all()
+        serializer = BorrowingSerializer(borrowings, many=True)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(borrowings.count(), 4)
+
+    def test_filtering_borrowings_by_user_id(self):
+        user = get_user_model().objects.create_user(
+            email="user@mail.com",
+            password="1qazcde34",
+            first_name="Sem",
+            last_name="Smith",
+        )
+
+        book1 = sample_book(title="sample1")
+        book2 = sample_book(title="sample2")
+
+        borrowing1 = sample_borrowing(user=user, book=book1)
+        borrowing2 = sample_borrowing(user=user, book=book2)
+        borrowing3 = sample_borrowing(user=self.user, book=book1)
+
+        response = self.client.get(
+            BORROWINGS_URL, {"user_id": user.id}
+        )
+
+        serializer1 = BorrowingSerializer(borrowing1)
+        serializer2 = BorrowingSerializer(borrowing2)
+        serializer3 = BorrowingSerializer(borrowing3)
+
+        self.assertIn(serializer1.data, response.data)
+        self.assertIn(serializer2.data, response.data)
+        self.assertNotIn(serializer3.data, response.data)
